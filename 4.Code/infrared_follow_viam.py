@@ -34,17 +34,12 @@ TurnSpeed = 90.0
 # init removed as all of that work is handled by the viam server.
 
 #advance
-def run():
-    try:
-        async with Channel(grpc_addr, grpc_port) as channel:
-            client = RobotServiceStub(channel)
-            req = BaseMoveStraightRequest()
-            req.name = BaseName
-            req.distance_millis = MoveDistance
-            req.millis_per_sec = MoveSpeed
-            status = await client.BaseMoveStraight(req)
-    except Exception as e:
-        print(e, file=sys.stderr)
+def run(client):
+    req = BaseMoveStraightRequest()
+    req.name = BaseName
+    req.distance_millis = MoveDistance
+    req.millis_per_sec = MoveSpeed
+    status = await client.BaseMoveStraight(req)
 
 #back
 def back():
@@ -62,48 +57,32 @@ def right():
     pass
 
 #turn left in place
-def spin_left():
-    try:
-        async with Channel(grpc_addr, grpc_port) as channel:
-            client = RobotServiceStub(channel)
-            req = BaseSpinRequest()
-            req.name = BaseName
-            req.angle_deg = -TurnDistance
-            req.degs_per_sec = TurnSpeed
-            status = await client.BaseSpin(req)
-    except Exception as e:
-        print(e, file=sys.stderr)
+def spin_left(client):
+    req = BaseSpinRequest()
+    req.name = BaseName
+    req.angle_deg = -TurnDistance
+    req.degs_per_sec = TurnSpeed
+    status = await client.BaseSpin(req)
 
 #turn right in place
-def spin_right():
-    try:
-        async with Channel(grpc_addr, grpc_port) as channel:
-            client = RobotServiceStub(channel)
-            req = BaseSpinRequest()
-            req.name = BaseName
-            req.angle_deg = -TurnDistance
-            req.degs_per_sec = TurnSpeed
-            status = await client.BaseSpin(req)
-    except Exception as e:
-        print(e, file=sys.stderr)
+def spin_right(client):
+    req = BaseSpinRequest()
+    req.name = BaseName
+    req.angle_deg = -TurnDistance
+    req.degs_per_sec = TurnSpeed
+    status = await client.BaseSpin(req)
 
 #brake
 def brake():
     # implement as needed
     pass
 
-def read_sensor(pin):
-    try:
-        async with Channel(grpc_addr, grpc_port) as channel:
-            client = RobotServiceStub(channel)
-            req = BoardGPIOGetRequest()
-            req.name = "local"
-            req.pin = pin
-            status = await client.BoardGPIOGet(req)
-            return req.high
-    except Exception as e:
-        print(e, file=sys.stderr)
-        return False #TODO(dannenberg) make this a more sensible failure handling
+def read_sensor(client, pin):
+    req = BoardGPIOGetRequest()
+    req.name = "local"
+    req.pin = pin
+    status = await client.BoardGPIOGet(req)
+    return req.high
 
 # TODO(dannenberg): add button scan in a viam-ish way
 def key_scan():
@@ -115,23 +94,27 @@ time.sleep(2)
 #the except statement catches the exception information and processes it.
 try:
     #key_scan()
-    while True:
-      #There is obstacle, the indicator light of the infrared obstacle avoidance module is on, and the port level is LOW
-      #There is no obstacle, the indicator light of the infrared obstacle avoidance module is off, and the port level is HIGH
-        LeftSensorValue  = read_sensor(AvoidSensorLeft);
-        RightSensorValue = read_sensor(AvoidSensorRight);
+    async with Channel(grpc_addr, grpc_port) as channel:
+        client = RobotServiceStub(channel)
+        while True:
+          #There is obstacle, the indicator light of the infrared obstacle avoidance module is on, and the port level is LOW
+          #There is no obstacle, the indicator light of the infrared obstacle avoidance module is off, and the port level is HIGH
+            LeftSensorValue  = read_sensor(client, AvoidSensorLeft);
+            RightSensorValue = read_sensor(client, AvoidSensorRight);
 
-        if LeftSensorValue == True and RightSensorValue == True :
-            run()     
-        elif LeftSensorValue == True and RightSensorValue == False :
-            spin_left()   
-            time.sleep(0.002)
-        elif RightSensorValue == True and LeftSensorValue == False:
-            spin_right()  
-            time.sleep(0.002)
-        elif RightSensorValue == False and LeftSensorValue == False :
-            spin_right()  
-            time.sleep(0.002)
+            if LeftSensorValue == True and RightSensorValue == True :
+                run(client)     
+            elif LeftSensorValue == True and RightSensorValue == False :
+                spin_left(client)   
+                time.sleep(0.002)
+            elif RightSensorValue == True and LeftSensorValue == False:
+                spin_right(client)  
+                time.sleep(0.002)
+            elif RightSensorValue == False and LeftSensorValue == False :
+                spin_right(client)  
+                time.sleep(0.002)
        
 except KeyboardInterrupt:
     pass
+except Exception as e:
+    print(e, file=sys.stderr)
