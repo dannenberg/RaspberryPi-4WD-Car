@@ -1,148 +1,137 @@
-#-*- coding:UTF-8 -*-
-import RPi.GPIO as GPIO
+-*- coding:UTF-8 -*-
+import asyncio
+import sys
+from typing import List
 import time
 
+from grpclib.client import Channel
+
+import gen
+from proto.api.v1.robot_pb2 import BoardGPIOGetRequest, StatusResponse
+from proto.api.v1.robot_grpc import RobotServiceStub
+
 #Definition of  motor pin 
-IN1 = 20
-IN2 = 21
-IN3 = 19
-IN4 = 26
-ENA = 16
-ENB = 13
+# deleted since base functions cover all our  motor needs
 
 #Definition of  button
-key = 8
+# removing the button scan for now
 
 #Definition of infrared obstacle avoidance module pin
-AvoidSensorLeft = 12
-AvoidSensorRight = 17
-
-#Set the GPIO port to BCM encoding mode
-GPIO.setmode(GPIO.BCM)
-
-#Ignore warning information
-GPIO.setwarnings(False)
+# changed from GPIO pin number to pi pin number
+# added other constants
+AvoidSensorLeft = "32"
+AvoidSensorRight = "11"
+BoardName = "local"
+BaseName = "yahboom-base"
+MoveDistance = 10
+MoveSpeed = 100.0
+TurnDistance = 30.0
+TurnSpeed = 90.0
 
 #Motor pins are initialized into output mode
 #Key pin is initialized into input mode
 #infrared obstacle avoidance module pins are initialized into input mode
-def init():
-    global pwm_ENA
-    global pwm_ENB
-    GPIO.setup(ENA,GPIO.OUT,initial=GPIO.HIGH)
-    GPIO.setup(IN1,GPIO.OUT,initial=GPIO.LOW)
-    GPIO.setup(IN2,GPIO.OUT,initial=GPIO.LOW)
-    GPIO.setup(ENB,GPIO.OUT,initial=GPIO.HIGH)
-    GPIO.setup(IN3,GPIO.OUT,initial=GPIO.LOW)
-    GPIO.setup(IN4,GPIO.OUT,initial=GPIO.LOW)
-    GPIO.setup(key,GPIO.IN)
-    GPIO.setup(AvoidSensorLeft,GPIO.IN)
-    GPIO.setup(AvoidSensorRight,GPIO.IN)
-    #Set the PWM pin and frequency is 2000hz
-    pwm_ENA = GPIO.PWM(ENA, 2000)
-    pwm_ENB = GPIO.PWM(ENB, 2000)
-    pwm_ENA.start(0)
-    pwm_ENB.start(0)
-	
+# init removed as all of that work is handled by the viam server.
+
 #advance
 def run():
-    GPIO.output(IN1, GPIO.HIGH)
-    GPIO.output(IN2, GPIO.LOW)
-    GPIO.output(IN3, GPIO.HIGH)
-    GPIO.output(IN4, GPIO.LOW)
-    pwm_ENA.ChangeDutyCycle(50)
-    pwm_ENB.ChangeDutyCycle(50)
+    try:
+        async with Channel(grpc_addr, grpc_port) as channel:
+            client = RobotServiceStub(channel)
+            req = BaseMoveStraightRequest()
+            req.name = BaseName
+            req.distance_millis = MoveDistance
+            req.millis_per_sec = MoveSpeed
+            status = await client.BaseMoveStraight(req)
+    except Exception as e:
+        print(e, file=sys.stderr)
 
 #back
 def back():
-    GPIO.output(IN1, GPIO.LOW)
-    GPIO.output(IN2, GPIO.HIGH)
-    GPIO.output(IN3, GPIO.LOW)
-    GPIO.output(IN4, GPIO.HIGH)
-    pwm_ENA.ChangeDutyCycle(50)
-    pwm_ENB.ChangeDutyCycle(50)
-	
+    # implement as needed
+    pass
+
 #turn left
 def left():
-    GPIO.output(IN1, GPIO.LOW)
-    GPIO.output(IN2, GPIO.LOW)
-    GPIO.output(IN3, GPIO.HIGH)
-    GPIO.output(IN4, GPIO.LOW)
-    pwm_ENA.ChangeDutyCycle(0)
-    pwm_ENB.ChangeDutyCycle(50)
+    # implement as needed
+    pass
 
 #turn right
 def right():
-    GPIO.output(IN1, GPIO.HIGH)
-    GPIO.output(IN2, GPIO.LOW)
-    GPIO.output(IN3, GPIO.LOW)
-    GPIO.output(IN4, GPIO.LOW)
-    pwm_ENA.ChangeDutyCycle(50)
-    pwm_ENB.ChangeDutyCycle(0)
-	
+    # implement as needed
+    pass
+
 #turn left in place
 def spin_left():
-    GPIO.output(IN1, GPIO.LOW)
-    GPIO.output(IN2, GPIO.HIGH)
-    GPIO.output(IN3, GPIO.HIGH)
-    GPIO.output(IN4, GPIO.LOW)
-    pwm_ENA.ChangeDutyCycle(50)
-    pwm_ENB.ChangeDutyCycle(50)
+    try:
+        async with Channel(grpc_addr, grpc_port) as channel:
+            client = RobotServiceStub(channel)
+            req = BaseSpinRequest()
+            req.name = BaseName
+            req.angle_deg = -TurnDistance
+            req.degs_per_sec = TurnSpeed
+            status = await client.BaseSpin(req)
+    except Exception as e:
+        print(e, file=sys.stderr)
 
 #turn right in place
 def spin_right():
-    GPIO.output(IN1, GPIO.HIGH)
-    GPIO.output(IN2, GPIO.LOW)
-    GPIO.output(IN3, GPIO.LOW)
-    GPIO.output(IN4, GPIO.HIGH)
-    pwm_ENA.ChangeDutyCycle(50)
-    pwm_ENB.ChangeDutyCycle(50)
+    try:
+        async with Channel(grpc_addr, grpc_port) as channel:
+            client = RobotServiceStub(channel)
+            req = BaseSpinRequest()
+            req.name = BaseName
+            req.angle_deg = -TurnDistance
+            req.degs_per_sec = TurnSpeed
+            status = await client.BaseSpin(req)
+    except Exception as e:
+        print(e, file=sys.stderr)
 
 #brake
 def brake():
-    GPIO.output(IN1, GPIO.LOW)
-    GPIO.output(IN2, GPIO.LOW)
-    GPIO.output(IN3, GPIO.LOW)
-    GPIO.output(IN4, GPIO.LOW)
+    # implement as needed
+    pass
 
+def read_sensor(pin):
+    try:
+        async with Channel(grpc_addr, grpc_port) as channel:
+            client = RobotServiceStub(channel)
+            req = BoardGPIOGetRequest()
+            req.name = "local"
+            req.pin = pin
+            status = await client.BoardGPIOGet(req)
+            return req.high
+    except Exception as e:
+        print(e, file=sys.stderr)
+        return False #TODO(dannenberg) make this a more sensible failure handling
+
+# TODO(dannenberg): add button scan in a viam-ish way
 def key_scan():
-    while GPIO.input(key):
-         pass
-    while not GPIO.input(key):
-	 time.sleep(0.01)
-         if not GPIO.input(key):
-             time.sleep(0.01)
-	     while not GPIO.input(key):
-	         pass
-	
+     pass
+            
 time.sleep(2)
 
 #The try/except statement is used to detect errors in the try block.
 #the except statement catches the exception information and processes it.
 try:
-    init()
-    key_scan()
+    #key_scan()
     while True:
       #There is obstacle, the indicator light of the infrared obstacle avoidance module is on, and the port level is LOW
       #There is no obstacle, the indicator light of the infrared obstacle avoidance module is off, and the port level is HIGH
-        LeftSensorValue  = GPIO.input(AvoidSensorLeft);
-        RightSensorValue = GPIO.input(AvoidSensorRight);
+        LeftSensorValue  = read_sensor(AvoidSensorLeft);
+        RightSensorValue = read_sensor(AvoidSensorRight);
 
         if LeftSensorValue == True and RightSensorValue == True :
             run()     
         elif LeftSensorValue == True and RightSensorValue == False :
             spin_left()   
-	    time.sleep(0.002)
+            time.sleep(0.002)
         elif RightSensorValue == True and LeftSensorValue == False:
             spin_right()  
-            time.sleep(0.002)			
+            time.sleep(0.002)
         elif RightSensorValue == False and LeftSensorValue == False :
             spin_right()  
-	    time.sleep(0.002)
+            time.sleep(0.002)
        
 except KeyboardInterrupt:
     pass
-pwm_ENA.stop()
-pwm_ENB.stop()
-GPIO.cleanup()
-
